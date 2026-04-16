@@ -1,0 +1,13 @@
+# ML & Vision Processing
+torch==2.2.1 --index-url https://download.pytorch.org/whl/cu121  # Optimized for your RTX 4060
+transformers
+accelerate
+pillow
+opencv-python
+
+# Web Environment (The Agent's Body)
+playwright
+
+# Utils
+python-dotenv
+rich # For beautiful terminal outputs during our demo
