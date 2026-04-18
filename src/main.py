@@ -1,20 +1,12 @@
 # src/main.py
-from tools.browser_env import BrowserEnvironment
+from agent.embodied_agent import EmbodiedAgent
 
 def main():
-    print("--- Booting Embodied AI Agent ---")
+    objective = "Go to github and find the top trending repository."
+    agent = EmbodiedAgent(objective=objective)
     
-    # Initialize the body
-    env = BrowserEnvironment(headless=False)
-    
-    try:
-        # Let's test its eyes on a simple website first
-        env.navigate_and_capture("https://github.com", "github_state.png")
-        print("Success! Check your folder for 'github_state.png'")
-        
-    finally:
-        # Always clean up
-        env.close()
+    # Start the agent on GitHub
+    agent.run(start_url="https://github.com")
 
 if __name__ == "__main__":
     main()
