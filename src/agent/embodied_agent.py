@@ -16,12 +16,12 @@ class EmbodiedAgent:
     def get_model_action(self, image_path: str) -> dict:
         print(f"[Brain] Sending visual data to {self.vision_model}...")
         
-        # Build the prompt with history
+        # Build the prompt
         full_prompt = f"{SYSTEM_PROMPT}\n\nUSER OBJECTIVE: {self.objective}"
         
-        # Add memory of the last action to prevent loops
-        if hasattr(self, 'last_action'):
-            full_prompt += f"\n\nYOUR PREVIOUS ACTION WAS: {json.dumps(self.last_action)}. If the screen looks exactly the same, you MUST try clicking somewhere else or scrolling."
+        # Smart Memory Injection (No Panicking)
+        if hasattr(self, 'last_action') and self.last_action:
+            full_prompt += f"\n\n[MEMORY] Your last action was: {json.dumps(self.last_action)}.\nEvaluate the new screenshot carefully. If your last action opened a new menu or changed the screen, continue your plan. ONLY pick a different action if you are completely stuck in a loop."
 
         try:
             # Calling local Ollama
@@ -37,19 +37,21 @@ class EmbodiedAgent:
             raw_text = response['message']['content']
             json_str = ""
             
-            # --- FAANG-Level Robust JSON Extraction ---
-            # 1. Try to extract from Markdown code blocks first
+            # --- FAANG-Level Bulletproof JSON Extraction ---
             if "```json" in raw_text:
                 json_str = raw_text.split("```json")[1].split("```")[0].strip()
             elif "```" in raw_text:
-                # Sometimes models just use ``` without the 'json' tag
                 json_str = raw_text.split("```")[1].split("```")[0].strip()
             else:
-                # 2. Fallback to a non-greedy regex (.*? instead of .*)
                 json_match = re.search(r'\{.*?\}', raw_text, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(0)
             
+            # --- THE ULTIMATE MULTI-JSON FIX ---
+            # If the model gives us two JSONs, we chop off everything after the very first '}'
+            if json_str and "}" in json_str:
+                json_str = json_str.split("}")[0] + "}"
+                
             # 3. Safely parse the extracted string
             if json_str:
                 action_data = json.loads(json_str)
@@ -70,24 +72,51 @@ class EmbodiedAgent:
     def execute_action(self, action_data: dict):
         action = action_data.get("action")
         
+        # 1. Extract the Set-of-Mark Element ID
+        element_id = action_data.get("element_id")
+        x, y = None, None
+        
+        if element_id is not None:
+            # Playwright evaluates JS objects with string keys, so we convert the ID to a string
+            coords = self.env.elements_mapping.get(str(element_id))
+            if coords:
+                x = coords['x']
+                y = coords['y']
+            else:
+                print(f"[Warning] Model hallucinated an invalid ID: {element_id}. Skipping click.")
+                return # Skip to the next loop so it doesn't crash
+                
+        # 2. Execute the Playwright Commands
         if action == "click":
-            print(f"[Action] Clicking at ({action_data.get('x')}, {action_data.get('y')})")
-            self.env.page.mouse.click(action_data['x'], action_data['y'])
-            
+            print(f"[Action] Clicking Box [{element_id}] at exactly ({x}, {y})")
+            if x and y:
+                self.env.page.mouse.click(x, y)
+                
         elif action == "type":
-            print(f"[Action] Clicking and typing '{action_data.get('text')}'")
-            self.env.page.mouse.click(action_data['x'], action_data['y'])
-            self.env.page.keyboard.type(action_data['text'])
-            
+            text_to_type = action_data.get('text', '')
+            print(f"[Action] Clicking Box [{element_id}] and typing '{text_to_type}'")
+            if x and y:
+                self.env.page.mouse.click(x, y)
+                self.env.page.keyboard.press("Control+A")
+                self.env.page.keyboard.press("Backspace")
+                
+                # NEW: Type with a 100ms delay between keys, like a human
+                self.env.page.keyboard.type(text_to_type, delay=100) 
+                
+                # NEW: Wait half a second before hitting enter, so the UI catches up
+                self.env.page.wait_for_timeout(500) 
+                self.env.page.keyboard.press("Enter")
+                
         elif action == "scroll":
             print(f"[Action] Scrolling {action_data.get('direction')}")
-            delta = 500 if action_data['direction'] == "down" else -500
+            delta = 500 if action_data.get('direction') == "down" else -500
             self.env.page.mouse.wheel(0, delta)
             
         elif action == "done":
             print("[System] Agent claims the task is complete!")
             
-        self.env.page.wait_for_timeout(2000) # Wait for page to react
+        # Give the browser time to process the click/typing/network load
+        self.env.page.wait_for_timeout(4000) # Increased to 4 seconds
 
     def run(self, start_url: str):
         """The main Observe -> Think -> Act loop."""
@@ -109,8 +138,8 @@ class EmbodiedAgent:
                 
             self.execute_action(action_data)
             
-            # Re-observe for the next loop
-            self.env.page.screenshot(path="state.png")
+            # Re-observe for the next loop (CRITICAL)
+            self.env.capture_current_state("state.png") 
             
         print("--- Task Finished or Max Steps Reached ---")
         self.env.close()
