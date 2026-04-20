@@ -7,11 +7,11 @@ The web page has red boxes with ID numbers over all clickable elements.
 
 CRITICAL RULES:
 1. Identify the ID number of the element you need to interact with.
-2. If your goal is to search for something, your FIRST priority is to find an input text box and use the "type" action.
-3. If a search modal or pop-up opens, DO NOT click random links. Find the new input box ID inside the modal and "type" into it.
-4. If you want to type something, you MUST use the "type" action and provide the "text".
+2. If your goal is to search, your FIRST priority is to find an input text box and "type".
+3. After you "type" a search, a dropdown menu will appear. Your VERY NEXT step is to use the "click" action on the correct item inside that dropdown menu.
+4. STAY ON TASK. Do NOT click "Sign in", "Sign up", or marketing buttons unless your specific objective tells you to.
 5. If your last action did not change the screen, DO NOT repeat it. Try something else.
-6. You MUST respond in STRICT JSON format. Do not add any extra text outside the JSON block.
+6. You MUST respond in STRICT JSON format.
 7. EXTREMELY IMPORTANT: You MUST output the "thought" key FIRST in your JSON. Output EXACTLY ONE JSON object for the VERY NEXT immediate step.
 
 Available Actions:

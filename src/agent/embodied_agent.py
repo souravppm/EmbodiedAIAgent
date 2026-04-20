@@ -12,6 +12,7 @@ class EmbodiedAgent:
         self.current_step = 0
         self.max_steps = 10
         self.vision_model = "llama3.2-vision" # Our local engine
+        self.last_action = None # Track state for loop prevention
         
     def get_model_action(self, image_path: str) -> dict:
         print(f"[Brain] Sending visual data to {self.vision_model}...")
@@ -55,7 +56,7 @@ class EmbodiedAgent:
             # 3. Safely parse the extracted string
             if json_str:
                 action_data = json.loads(json_str)
-                self.last_action = action_data # Save memory
+                # Removed: self.last_action = action_data (Moved to run() loop)
                 return action_data
             else:
                 print(f"[Error] Could not locate JSON structure. Raw output:\n{raw_text}")
@@ -100,12 +101,14 @@ class EmbodiedAgent:
                 self.env.page.keyboard.press("Control+A")
                 self.env.page.keyboard.press("Backspace")
                 
-                # NEW: Type with a 100ms delay between keys, like a human
+                # Type like a human
                 self.env.page.keyboard.type(text_to_type, delay=100) 
                 
-                # NEW: Wait half a second before hitting enter, so the UI catches up
-                self.env.page.wait_for_timeout(500) 
+                # CRITICAL: Force the submission
+                self.env.page.wait_for_timeout(1000) 
                 self.env.page.keyboard.press("Enter")
+                self.env.page.wait_for_timeout(1000) # Wait for React UI
+                self.env.page.keyboard.press("Enter") # Double tap to force search
                 
         elif action == "scroll":
             print(f"[Action] Scrolling {action_data.get('direction')}")
@@ -136,10 +139,26 @@ class EmbodiedAgent:
             if action_data.get("action") == "done":
                 break
                 
+            # --- FAANG LEVEL GUARDRAIL: Anti-Loop Protection ---
+            if hasattr(self, 'last_action') and self.last_action:
+                last_id = self.last_action.get("element_id")
+                current_id = action_data.get("element_id")
+                action_type = action_data.get("action")
+                
+                if action_type == "click" and last_id == current_id:
+                    print(f"[System Guardrail] Loop detected on Box [{current_id}]. Pressing ESCAPE to clear modals.")
+                    # Instead of scrolling down to marketing garbage, we press Escape to close broken dropdowns
+                    action_data = {"action": "type", "element_id": current_id, "text": ""} # Dummy action
+                    self.env.page.keyboard.press("Escape")
+                    self.env.page.wait_for_timeout(1000)
+            # ---------------------------------------------------
+                
             self.execute_action(action_data)
             
-            # Re-observe for the next loop (CRITICAL)
+            # NEW: Save the memory HERE, after everything is done!
+            self.last_action = action_data 
+            
             self.env.capture_current_state("state.png") 
             
-        print("--- Task Finished or Max Steps Reached ---")
+        print("--- Task Finished ---")
         self.env.close()
