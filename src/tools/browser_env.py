@@ -41,18 +41,28 @@ class BrowserEnvironment:
             let idCounter = 1;
             let elementsMap = {};
             
-            // Prioritize inputs, textareas, and main buttons over generic links
             let elements = document.querySelectorAll('input, textarea, button, [role="button"], a');
             
             elements.forEach(el => {
+                // THE HARD CAP: Never draw more than 60 boxes to save AI context and VRAM
+                if (idCounter > 60) return; 
+
                 let rect = el.getBoundingClientRect();
                 
-                // STRICT FILTER: Only label it if it's actually big enough to matter (removes tiny useless links)
+                // Only label standard inputs or reasonably sized links
                 let isInput = el.tagName.toLowerCase() === 'input';
-                let isLargeEnough = rect.width > 25 && rect.height > 20; 
-                let isVisible = rect.top >= 0 && rect.left >= 0 && el.style.visibility !== 'hidden';
+                let isLargeEnough = rect.width > 20 && rect.height > 15; 
+                let isVisible = el.style.visibility !== 'hidden' && el.style.display !== 'none';
 
-                if (isVisible && (isInput || isLargeEnough)) { 
+                // THE CULLING: Only tag elements that are physically inside the current screen view!
+                let inViewport = (
+                    rect.top >= 0 &&
+                    rect.left >= 0 &&
+                    rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                    rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+                );
+
+                if (isVisible && inViewport && (isInput || isLargeEnough)) { 
                     let div = document.createElement('div');
                     div.className = 'som-box';
                     div.style.position = 'fixed';
@@ -62,7 +72,7 @@ class BrowserEnvironment:
                     div.style.backgroundColor = 'rgba(255, 255, 0, 0.9)';
                     div.style.color = 'black';
                     div.style.fontWeight = 'bold';
-                    div.style.fontSize = '14px'; // Made text slightly bigger for the AI
+                    div.style.fontSize = '14px';
                     div.style.padding = '2px';
                     div.style.zIndex = 9999;
                     div.innerText = idCounter;

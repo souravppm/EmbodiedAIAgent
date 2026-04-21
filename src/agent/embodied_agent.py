@@ -6,14 +6,16 @@ from tools.browser_env import BrowserEnvironment
 from core.prompts import SYSTEM_PROMPT
 
 class EmbodiedAgent:
-    def __init__(self, objective: str):
+    def __init__(self, objective: str, vision_model: str = "llama3.2-vision", headless: bool = False):
         self.objective = objective
-        self.env = BrowserEnvironment(headless=False)
-        self.current_step = 0
-        self.max_steps = 10
-        self.vision_model = "llama3.2-vision" # Our local engine
-        self.last_action = None # Track state for loop prevention
+        self.vision_model = vision_model
         
+        # Pass the headless flag to our browser environment
+        self.env = BrowserEnvironment(headless=headless)
+        
+        self.current_step = 0
+        self.max_steps = 15 # Give it enough steps to complete longer tasks
+        self.last_action = None
     def get_model_action(self, image_path: str) -> dict:
         print(f"[Brain] Sending visual data to {self.vision_model}...")
         
