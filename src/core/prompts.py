@@ -11,7 +11,7 @@ CRITICAL RULES:
 3. After you "type" a search, a dropdown menu will appear. Your VERY NEXT step is to use the "click" action on the correct item inside that dropdown menu.
 4. STAY ON TASK. Do NOT click "Sign in", "Sign up", or marketing buttons unless your specific objective tells you to.
 5. If your last action did not change the screen, DO NOT repeat it. Try something else.
-6. You MUST respond in STRICT JSON format.
+6. NO CONVERSATIONAL TEXT. You are a robot. Do not output any greetings, explanations, or thinking outside the JSON. You MUST respond ONLY with the JSON block.
 7. EXTREMELY IMPORTANT: You MUST output the "thought" key FIRST in your JSON. Output EXACTLY ONE JSON object for the VERY NEXT immediate step.
 
 Available Actions:

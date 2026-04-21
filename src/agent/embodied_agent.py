@@ -41,18 +41,15 @@ class EmbodiedAgent:
             json_str = ""
             
             # --- FAANG-Level Bulletproof JSON Extraction ---
-            if "```json" in raw_text:
-                json_str = raw_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in raw_text:
-                json_str = raw_text.split("```")[1].split("```")[0].strip()
-            else:
-                json_match = re.search(r'\{.*?\}', raw_text, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
+            json_str = ""
+            # Find the very first '{' and the very last '}' in the entire text
+            json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
             
-            # --- THE ULTIMATE MULTI-JSON FIX ---
-            # If the model gives us two JSONs, we chop off everything after the very first '}'
-            if json_str and "}" in json_str:
+            if json_match:
+                json_str = json_match.group(0)
+                
+            # THE ULTIMATE MULTI-JSON FIX
+            if json_str and "}\n{" in json_str.replace(" ", ""):
                 json_str = json_str.split("}")[0] + "}"
                 
             # 3. Safely parse the extracted string
@@ -163,4 +160,3 @@ class EmbodiedAgent:
             self.env.capture_current_state("state.png") 
             
         print("--- Task Finished ---")
-        self.env.close()
