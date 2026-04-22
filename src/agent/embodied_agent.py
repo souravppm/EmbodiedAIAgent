@@ -16,6 +16,7 @@ class EmbodiedAgent:
         self.current_step = 0
         self.max_steps = 15 # Give it enough steps to complete longer tasks
         self.last_action = None
+        self.run_history = [] # NEW: Store the agent's journey
     def get_model_action(self, image_path: str) -> dict:
         print(f"[Brain] Sending visual data to {self.vision_model}...")
         
@@ -40,19 +41,16 @@ class EmbodiedAgent:
             raw_text = response['message']['content']
             json_str = ""
             
-            # --- FAANG-Level Bulletproof JSON Extraction ---
+            # FAANG Level Bulletproof JSON Extraction
             json_str = ""
-            # Find the very first '{' and the very last '}' in the entire text
-            json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+            
+            # Using .*? makes it NON GREEDY. It stops at the very first closing bracket.
+            json_match = re.search(r'\{.*?\}', raw_text, re.DOTALL)
             
             if json_match:
                 json_str = json_match.group(0)
                 
-            # THE ULTIMATE MULTI-JSON FIX
-            if json_str and "}\n{" in json_str.replace(" ", ""):
-                json_str = json_str.split("}")[0] + "}"
-                
-            # 3. Safely parse the extracted string
+            # Safely parse the extracted string
             if json_str:
                 action_data = json.loads(json_str)
                 # Removed: self.last_action = action_data (Moved to run() loop)
@@ -132,10 +130,19 @@ class EmbodiedAgent:
             # 1. Observe (Already done initially, or at the end of last loop)
             # 2. Think (Send screenshot to VLM)
             action_data = self.get_model_action("state.png")
-            print(f"[Thought] {action_data.get('thought', 'No thought provided')}")
+            thought = action_data.get('thought', 'No thought provided')
+            print(f"[Thought] {thought}")
+            
+            # Save to history
+            self.run_history.append({
+                "step": self.current_step,
+                "thought": thought,
+                "action": action_data
+            })
             
             # 3. Act (Execute in browser)
             if action_data.get("action") == "done":
+                print("[System] Agent claims the task is complete!")
                 break
                 
             # --- FAANG LEVEL GUARDRAIL: Anti-Loop Protection ---
@@ -160,3 +167,19 @@ class EmbodiedAgent:
             self.env.capture_current_state("state.png") 
             
         print("--- Task Finished ---")
+        self.env.close()
+        
+        # NEW: Generate the final report
+        self.save_report()
+
+    def save_report(self):
+        """Generates a clean markdown report of the AI's actions."""
+        print("\n[System] Generating Run Report...")
+        with open("run_report.md", "w", encoding="utf-8") as f:
+            f.write(f"# Embodied AI Run Report\n\n")
+            f.write(f"**Objective:** {self.objective}\n\n")
+            for item in self.run_history:
+                f.write(f"### Step {item['step']}\n")
+                f.write(f"**Thought:** {item['thought']}\n")
+                f.write(f"**Action Executed:** `{item['action']}`\n\n")
+        print("[System] Report saved to run_report.md! 🚀")

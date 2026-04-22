@@ -92,5 +92,13 @@ class BrowserEnvironment:
         self.elements_mapping = self.page.evaluate(js_code)
 
     def close(self):
-        self.browser.close()
-        self.playwright.stop()
+        """Safely shuts down the Playwright browser."""
+        try:
+            if hasattr(self, 'browser') and self.browser:
+                self.browser.close()
+            if hasattr(self, 'playwright') and self.playwright:
+                self.playwright.stop()
+        except Exception:
+            # If the event loop is already closed, we just silently ignore it.
+            pass
+        print("[System] Browser environment closed safely.")
