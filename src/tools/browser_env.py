@@ -1,15 +1,16 @@
 # src/tools/browser_env.py
+from typing import Dict, Any
 from playwright.sync_api import sync_playwright
 
 class BrowserEnvironment:
-    def __init__(self, headless=False):
+    def __init__(self, headless: bool = False) -> None:
         self.playwright = sync_playwright().start()
         self.browser = self.playwright.chromium.launch(headless=headless)
         self.context = self.browser.new_context(viewport={'width': 1280, 'height': 720})
         self.page = self.context.new_page()
-        self.elements_mapping = {} # Stores ID -> (x, y)
+        self.elements_mapping: Dict[str, Any] = {} # Stores ID -> (x, y)
 
-    def navigate_and_capture(self, url: str, output_image: str = "state.png"):
+    def navigate_and_capture(self, url: str, output_image: str = "state.png") -> None:
         print(f"[System] Navigating to {url}...")
         try:
             self.page.goto(url, wait_until="load", timeout=60000)
@@ -24,13 +25,13 @@ class BrowserEnvironment:
         self.page.screenshot(path=output_image)
         print(f"[System] Vision state with SOM captured and saved to {output_image}")
 
-    def capture_current_state(self, output_image: str = "state.png"):
+    def capture_current_state(self, output_image: str = "state.png") -> None:
         """Call this after an action to get the fresh screen with new boxes."""
         self.page.wait_for_timeout(2500)
         self.inject_set_of_mark()
         self.page.screenshot(path=output_image)
         
-    def inject_set_of_mark(self):
+    def inject_set_of_mark(self) -> None:
         """Injects JS to draw numbered boxes on clickable elements and returns their coordinates."""
         print("[System] Injecting Set-of-Mark bounding boxes...")
         
@@ -91,14 +92,15 @@ class BrowserEnvironment:
         # Execute JS and save the mapping so our Python code knows where ID 5 is
         self.elements_mapping = self.page.evaluate(js_code)
 
-    def close(self):
+    def close(self) -> None:
         """Safely shuts down the Playwright browser."""
         try:
             if hasattr(self, 'browser') and self.browser:
                 self.browser.close()
             if hasattr(self, 'playwright') and self.playwright:
                 self.playwright.stop()
-        except Exception:
+        except Exception as e:
             # If the event loop is already closed, we just silently ignore it.
-            pass
+            if "Event loop is closed" not in str(e):
+                print(f"[Warning] Error during browser shutdown: {e}")
         print("[System] Browser environment closed safely.")
