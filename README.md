@@ -1,45 +1,20 @@
-# Embodied AI Agent
+# Embodied AI Web Agent (GPT-4o-mini Powered)
 
-An open-source, locally-hosted multimodal AI agent designed to navigate and interact with web environments autonomously. 
+An autonomous web agent that can navigate websites, search for information, and complete tasks using GPT-4o-mini's vision capabilities and Playwright.
 
-## 🚀 The Vision
-Standard LLMs can chat, but they cannot act. This project builds an "Embodied" agent equipped with **vision** (to perceive the screen) and **action** frameworks (to click, type, and navigate) to solve real-world workflows entirely locally, ensuring privacy and zero API costs.
+## 🚀 Features
+- **Vision-Driven Navigation:** Uses Set-of-Mark (SoM) to label UI elements for the AI.
+- **Fast Execution:** Powered by OpenAI's gpt-4o-mini for near-instant decisions.
+- **Robust Parsing:** Advanced JSON extraction to prevent agent crashes.
+- **Secure Architecture:** Uses `.env` for API key management.
 
-## 🧠 System Architecture
-We follow a modular `Input -> Processing -> Output` pipeline:
-- **Perception (Brain):** Local Vision-Language Models (currently `llama3.2-vision` via Ollama) running efficiently on consumer GPUs (e.g., RTX 4060).
-- **Action (Body):** Playwright for robust web automation and DOM manipulation.
-- **Design Pattern:** Observe ➔ Think ➔ Act cycle with robust JSON-parsing and error recovery.
+## 🛠️ Setup
+1. Clone the repo.
+2. Install dependencies: `pip install -r requirements.txt`
+3. Setup Playwright: `playwright install chromium`
+4. Create a `.env` file and add your key: `OPENAI_API_KEY=your_key_here`
 
-## 🛠️ Setup Instructions
-
-### 1. Prerequisites
-- Python 3.10+
-- [Ollama](https://ollama.com/) installed on your system.
-
-### 2. Install the Vision Model
-Pull the lightweight vision model using Ollama:
+## 🏃 Usage
 ```bash
-ollama run llama3.2-vision
+python src/main.py --url "https://github.com" --task "Find the top trending repositories"
 ```
-
-### 3. Install Dependencies
-Clone the repository and set up your environment:
-
-```bash
-python -m venv venv
-# Activate the environment (Windows: venv\Scripts\activate | Mac/Linux: source venv/bin/activate)
-
-pip install -r requirements.txt
-playwright install chromium
-```
-
-### 4. Run the Agent
-```bash
-python src/main.py
-```
-
-## 🚧 Current Roadmap & Engineering Challenges
-- [x] Phase 1: Core framework setup (Playwright + Local VLM loop).
-- [x] Phase 2: Robust JSON instruction parsing and memory state.
-- [ ] Phase 3 (Current): Standard VLMs struggle with pixel-perfect coordinate generation. Implementing "Set-of-Mark" (SoM) prompting via JavaScript injection to map UI elements to ID numbers, eliminating spatial hallucination.
