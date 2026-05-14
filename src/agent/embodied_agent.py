@@ -1,73 +1,83 @@
-# src/agent/embodied_agent.py
-import json
+import os
 import re
-import ollama
+import json
+import base64
+from typing import Dict, Any, Optional, List
+
+from dotenv import load_dotenv
+from openai import OpenAI
+
 from tools.browser_env import BrowserEnvironment
-from core.prompts import SYSTEM_PROMPT
+
+load_dotenv()
 
 class EmbodiedAgent:
-    def __init__(self, objective: str, vision_model: str = "llama3.2-vision", headless: bool = False):
-        self.objective = objective
-        self.vision_model = vision_model
+    def __init__(self, objective: str, headless: bool = False) -> None:
+        self.objective: str = objective
+        self.env: BrowserEnvironment = BrowserEnvironment(headless=headless)
+        self.current_step: int = 0
+        self.max_steps: int = 15 
+        self.last_action: Optional[Dict[str, Any]] = None
+        self.run_history: List[Dict[str, Any]] = []
+
+    def encode_image(self, image_path: str) -> str:
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+
+    def get_model_action(self, image_path: str) -> Dict[str, Any]:
+        print("[Brain] Sending visual data to gpt-4o-mini...")
         
-        # Pass the headless flag to our browser environment
-        self.env = BrowserEnvironment(headless=headless)
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
-        self.current_step = 0
-        self.max_steps = 15 # Give it enough steps to complete longer tasks
-        self.last_action = None
-        self.run_history = [] # NEW: Store the agent's journey
-    def get_model_action(self, image_path: str) -> dict:
-        print(f"[Brain] Sending visual data to {self.vision_model}...")
+        base64_image = self.encode_image(image_path)
         
-        # Build the prompt
-        full_prompt = f"{SYSTEM_PROMPT}\n\nUSER OBJECTIVE: {self.objective}"
+        system_prompt = (
+            "You are an advanced Embodied AI Web Agent. "
+            "Your goal is to navigate the web to solve the user's task.\n"
+            "Rules:\n"
+            "1. Respond ONLY with a single JSON object.\n"
+            "2. Format: {\"thought\": \"your reasoning\", \"action\": \"click/type/scroll/done\", \"element_id\": number, \"text\": \"optional\"}\n"
+            "3. Prioritize input boxes for searching.\n"
+            "4. If the task is finished, use action \"done\"."
+        )
+
+        full_prompt = f"{system_prompt}\n\nUSER OBJECTIVE: {self.objective}"
         
-        # Smart Memory Injection (No Panicking)
-        if hasattr(self, 'last_action') and self.last_action:
-            full_prompt += f"\n\n[MEMORY] Your last action was: {json.dumps(self.last_action)}.\nEvaluate the new screenshot carefully. If your last action opened a new menu or changed the screen, continue your plan. ONLY pick a different action if you are completely stuck in a loop."
+        if self.last_action:
+            full_prompt += f"\n\n[MEMORY] Your last action was: {json.dumps(self.last_action)}."
 
         try:
-            # Calling local Ollama
-            response = ollama.chat(
-                model=self.vision_model,
-                messages=[{
-                    'role': 'user',
-                    'content': full_prompt,
-                    'images': [image_path]
-                }]
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": full_prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+                        ],
+                    }
+                ],
+                max_tokens=300
             )
             
-            raw_text = response['message']['content']
-            json_str = ""
+            raw_text = response.choices[0].message.content or ""
             
-            # FAANG Level Bulletproof JSON Extraction
+            # Robust JSON parsing
             json_str = ""
-            
-            # Using .*? makes it NON GREEDY. It stops at the very first closing bracket.
             json_match = re.search(r'\{.*?\}', raw_text, re.DOTALL)
-            
             if json_match:
                 json_str = json_match.group(0)
-                
-            # Safely parse the extracted string
+            
             if json_str:
-                action_data = json.loads(json_str)
-                # Removed: self.last_action = action_data (Moved to run() loop)
-                return action_data
-            else:
-                print(f"[Error] Could not locate JSON structure. Raw output:\n{raw_text}")
-                return {"action": "done", "thought": "Failed to extract JSON, stopping."}
-                
-        except json.JSONDecodeError as e:
-            print(f"[Parse Error] The model output invalid JSON: {e}\nRaw output: {raw_text}")
-            return {"action": "done", "thought": "Invalid JSON format, stopping."}
+                return json.loads(json_str)
+            return {"thought": "Failed to parse JSON", "action": "done"}
             
         except Exception as e:
-            print(f"[System Error] {e}")
-            return {"action": "done", "thought": "System error, stopping."}
+            print(f"[Error] AI request failed: {e}")
+            return {"thought": "Error occurred", "action": "done"}
 
-    def execute_action(self, action_data: dict):
+    def execute_action(self, action_data: Dict[str, Any]) -> None:
         action = action_data.get("action")
         
         # 1. Extract the Set-of-Mark Element ID
@@ -118,7 +128,7 @@ class EmbodiedAgent:
         # Give the browser time to process the click/typing/network load
         self.env.page.wait_for_timeout(4000) # Increased to 4 seconds
 
-    def run(self, start_url: str):
+    def run(self, start_url: str) -> None:
         """The main Observe -> Think -> Act loop."""
         print(f"--- Starting Task: {self.objective} ---")
         self.env.navigate_and_capture(start_url, "state.png")
@@ -172,7 +182,7 @@ class EmbodiedAgent:
         # NEW: Generate the final report
         self.save_report()
 
-    def save_report(self):
+    def save_report(self) -> None:
         """Generates a clean markdown report of the AI's actions."""
         print("\n[System] Generating Run Report...")
         with open("run_report.md", "w", encoding="utf-8") as f:
