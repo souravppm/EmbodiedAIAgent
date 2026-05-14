@@ -37,7 +37,6 @@ def main():
     # Initialize and run the agent with the user's inputs
     agent = EmbodiedAgent(
         objective=args.task,
-        vision_model="llama3.2-vision",
         headless=args.headless
     )
     
