@@ -30,14 +30,12 @@ class DesktopAgent:
         SYSTEM_PROMPT = """You are an advanced Desktop AI Agent. You control the user's actual Windows computer.
         Look at the screenshot and decide the next action to achieve the user's objective.
         
-        You cannot see bounding boxes. Instead, you must predict the exact X and Y coordinates as a PERCENTAGE (0 to 100) of the screen.
-        Top-Left is x: 0, y: 0. Bottom-Right is x: 100, y: 100.
-        
         Rules:
         1. Respond ONLY with a single JSON object.
-        2. Format: {"thought": "your reasoning", "action": "click", "x_percent": 50, "y_percent": 50}
-        3. If you need to type, use action "type" and add a "text" key.
-        4. If the task is finished, use action "done".
+        2. Format for clicking: {"thought": "...", "action": "click", "x_percent": 50, "y_percent": 50}
+        3. Format for typing: {"thought": "...", "action": "type", "text": "your text"}
+        4. Format for pressing special keys (like 'win', 'enter', 'esc'): {"thought": "...", "action": "press", "key": "win"}
+        5. If the task is finished, use action "done".
         """
 
         full_prompt = f"{SYSTEM_PROMPT}\n\nUSER OBJECTIVE: {self.objective}"
@@ -96,6 +94,14 @@ class DesktopAgent:
             print(f"[Action] Typing: '{text}'")
             pyautogui.write(text, interval=0.05)
             pyautogui.press('enter')
+            time.sleep(1) # Wait for Windows to react
+
+        # Add this NEW block for pressing keys!
+        elif action == "press":
+            key = action_data.get("key", "enter")
+            print(f"[Action] Pressing key: '{key}'")
+            pyautogui.press(key)
+            time.sleep(1.5) # Wait for the Start Menu to physically open before doing anything else
 
         return False
 
