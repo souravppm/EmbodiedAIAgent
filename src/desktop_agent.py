@@ -35,7 +35,8 @@ class DesktopAgent:
         2. Format for clicking: {"thought": "...", "action": "click", "x_percent": 50, "y_percent": 50}
         3. Format for typing: {"thought": "...", "action": "type", "text": "your text"}
         4. Format for pressing special keys (like 'win', 'enter', 'esc'): {"thought": "...", "action": "press", "key": "win"}
-        5. If the task is finished, use action "done".
+        5. CRITICAL: If the Windows Start Menu is open, DO NOT click anything. Just use the "type" action directly. Clicking will close the menu!
+        6. If the task is finished, use action "done".
         """
 
         full_prompt = f"{SYSTEM_PROMPT}\n\nUSER OBJECTIVE: {self.objective}"
