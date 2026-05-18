@@ -16,6 +16,7 @@ class DesktopAgent:
     def __init__(self, objective: str):
         self.objective = objective
         self.screen_width, self.screen_height = pyautogui.size()
+        self.last_action = None  # 🧠 ADD THIS: Initialize memory
         print(f"🖥️ Initialized Desktop Agent on {self.screen_width}x{self.screen_height} screen.")
 
     def encode_image(self, image_path):
@@ -34,12 +35,16 @@ class DesktopAgent:
         1. Respond ONLY with a single JSON object.
         2. Format for clicking: {"thought": "...", "action": "click", "x_percent": 50, "y_percent": 50}
         3. Format for typing: {"thought": "...", "action": "type", "text": "your text"}
-        4. Format for pressing special keys (like 'win', 'enter', 'esc'): {"thought": "...", "action": "press", "key": "win"}
-        5. CRITICAL: If the Windows Start Menu is open, DO NOT click anything. Just use the "type" action directly. Clicking will close the menu!
+        4. Format for pressing special keys: {"thought": "...", "action": "press", "key": "win"}
+        5. CRITICAL: The Start Menu is NEVER open by default. If you need to search for an app, you MUST use the "press" action with the "win" key first.
         6. If the task is finished, use action "done".
         """
 
         full_prompt = f"{SYSTEM_PROMPT}\n\nUSER OBJECTIVE: {self.objective}"
+
+        # 🧠 ADD THIS: Remind the AI what it just did so it doesn't loop!
+        if self.last_action:
+            full_prompt += f"\n\n[MEMORY] Your last action was: {json.dumps(self.last_action)}. DO NOT repeat the exact same action."
 
         try:
             response = client.chat.completions.create(
@@ -93,9 +98,18 @@ class DesktopAgent:
         elif action == "type":
             text = action_data.get("text", "")
             print(f"[Action] Typing: '{text}'")
+            
+            # Type the text
             pyautogui.write(text, interval=0.05)
+            
+            # 🧠 ADD THIS PAUSE: Wait for Windows Search to find the app!
+            time.sleep(2.0) 
+            
+            # Now it is safe to press Enter
             pyautogui.press('enter')
-            time.sleep(1) # Wait for Windows to react
+            
+            # Wait for the app to fully open on the screen
+            time.sleep(3.0)
 
         # Add this NEW block for pressing keys!
         elif action == "press":
@@ -118,6 +132,9 @@ class DesktopAgent:
             
             action_data = self.get_model_action(screenshot_path)
             is_done = self.execute_action(action_data)
+            
+            # 🧠 ADD THIS: Save the action to memory for the next loop
+            self.last_action = action_data 
             
             if is_done:
                 break
